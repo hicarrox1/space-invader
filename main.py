@@ -3,7 +3,7 @@ import random
 
 class ElementGraphique():
 
-    def __init__(self, pos_x: int, pos_y: int, size: tuple, col: int, direction: int) -> None:
+    def __init__(self, pos_x: int, pos_y: int, size: tuple, image_pos: tuple, direction: int,transparant_col: int, image: int = 0) -> None:
         
         self.pos_x = pos_x
         self.pos_y = pos_y
@@ -11,11 +11,14 @@ class ElementGraphique():
         self.dy = direction[1]
 
         self.size = size
-        self.col = col
+
+        self.image_pos = image_pos
+        self.image = image
+        self.transparant_col = transparant_col
 
     def draw(self):
 
-        pyxel.rect(self.pos_x,self.pos_y,self.size[0],self.size[1],self.col)
+        pyxel.blt(self.pos_x,self.pos_y,self.image,self.image_pos[0],self.image_pos[1],self.size[0],self.size[1],self.transparant_col)
 
     def update(self):
 
@@ -40,12 +43,12 @@ class ElementGraphique():
 class Missile(ElementGraphique):
 
     def __init__(self, pos_x: int, pos_y: int, direction: int) -> None:
-        super().__init__(pos_x, pos_y, (1,2), 5, direction)
+        super().__init__(pos_x, pos_y, (4,8), (22,86), direction, 0)
 
-class Player(ElementGraphique):
+class Vaisseau(ElementGraphique):
 
-    def __init__(self, pos_x: int, pos_y: int, size: tuple, col: int, direction: int, life: int) -> None:
-        super().__init__(pos_x, pos_y, size, col, direction)
+    def __init__(self, pos_x: int, pos_y: int, size: tuple, image_pos: tuple, direction: int, transparant_col: int, life: int, image: int = 0) -> None:
+        super().__init__(pos_x, pos_y, size, image_pos, direction, transparant_col, image)
 
         self.life = life
 
@@ -58,12 +61,14 @@ class Player(ElementGraphique):
 
             missile.draw()
 
+    def apply_gravity(self):
+
+        self.pos_x += self.dx
+        self.pos_y += self.dy
+
     def update(self):
 
-        if self.pos_x + self.dx >= 0 and self.pos_x + self.dx < pyxel.width - self.size[0]+1:
-            self.pos_x += self.dx
-        if self.pos_y + self.dy >= 0 and self.pos_y + self.dy < pyxel.height - self.size[1]+1:
-            self.pos_y += self.dy
+        self.apply_gravity()
 
         for missile in self.missiles:
 
@@ -77,13 +82,20 @@ class Player(ElementGraphique):
 
         self.missiles.append(Missile(self.pos_x+int(self.size[0]/2),self.pos_y,direction))
 
-class Vaisseau(Player):
+class Player(Vaisseau):
     
     def __init__(self, pos_x: int, pos_y: int) -> None:
-        super().__init__(pos_x, pos_y, (5,5),8, (0,0), 100)
+        super().__init__(pos_x, pos_y, (16,16), (0,80), (0,0), 0, 100)
 
         self.cooldown = 7
         self.start = 0
+
+    def apply_gravity(self):
+        
+        if self.pos_x + self.dx >= 0 and self.pos_x + self.dx < pyxel.width - self.size[0]+1:
+            self.pos_x += self.dx
+        if self.pos_y + self.dy >= 0 and self.pos_y + self.dy < pyxel.height - self.size[1]+1:
+            self.pos_y += self.dy
 
     def update(self):
         super().update()
@@ -111,13 +123,27 @@ class Vaisseau(Player):
         else:
             self.dx = 0
 
-class Ennemi(Player):
+class Ennemi(Vaisseau):
 
-    def __init__(self, pos_x: int, pos_y: int, direction: tuple, life: int) -> None:
-        super().__init__(pos_x, pos_y, (3,3),4,direction, life)
+    def __init__(self, pos_x: int, pos_y: int, direction: tuple) -> None:
+        super().__init__(pos_x, pos_y, (16,9), (32,80), direction, 0, 20)
 
-        self.cooldown = random.randint(40,200) 
+        self.cooldown = random.randint(40,200)
         self.start = 0
+
+    def apply_gravity(self):
+
+        self.pos_x += self.dx
+
+        if not self.pos_x + self.dx < pyxel.width - self.size[0]+1:
+            self.dx = -0.1
+        elif not self.pos_x + self.dx >= 0:
+            self.dx = 0.1
+            
+        if self.pos_y + self.dy >= 0 and self.pos_y + self.dy < pyxel.height - self.size[1]+1:
+            self.pos_y += self.dy
+        else:
+            self.explode()
 
     def update(self):
         super().update()
@@ -135,9 +161,10 @@ class App():
         pyxel.init(50,50)
         
         self.score = 0
-        self.vaisseau = Vaisseau(25,40)
+        self.vaisseau = Player(25,40)
         self.enemis :list[Ennemi] = []
 
+        pyxel.load("2.pyxres")
         pyxel.run(self.update,self.draw)
 
     def update(self):
@@ -176,11 +203,11 @@ class App():
     def spawn_wave(self):
 
         for i in range(5):
-                self.spawn_enemi((i*10+random.randint(2,8),5),(0, random.randint(5,20) *10 ** -3 ))
+                self.spawn_enemi((i*10+random.randint(2,8),5),(0.1, random.randint(5,20) *10 ** -3 ))
 
     def spawn_enemi(self, pos: tuple, direction: tuple):
 
-        self.enemis.append(Ennemi(pos[0],pos[1],direction,20))
+        self.enemis.append(Ennemi(pos[0],pos[1],direction))
 
     def test_missile_enemi(self):
 
